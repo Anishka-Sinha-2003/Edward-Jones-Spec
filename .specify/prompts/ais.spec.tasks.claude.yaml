@@ -1,0 +1,6 @@
+description: "Generate dependency-ordered task list and validate cross-artifact consistency."
+handoffs:
+  - label: Implement Project
+    agent: ais.spec.implement
+    prompt: Start the implementation in phases
+    send: true

@@ -1,0 +1,42 @@
+# Playbooks
+
+Reusable domain knowledge for different engagement types. Playbooks capture patterns, risks, estimation heuristics, and typical spec decompositions that inform pre-sales proposals and delivery planning.
+
+## What Playbooks Do
+
+- **Pre-sales**: Inform discovery questions, spec decomposition, technology recommendations, and ROM estimation during `/ais.presales.synthesize` and `/ais.presales.propose`
+- **Setup**: Guide architecture patterns and spec decomposition during `/ais.setup.plan` and `/ais.setup.architecture`
+- **Delivery**: Provide domain-specific risk patterns and quality gates that seed the constitution
+
+## Available Playbooks
+
+| Playbook | Engagement Type | When to Use |
+|----------|----------------|-------------|
+| [Agent & AI Builds](agent-ai-builds.md) | AI agents, copilots, RAG systems, ML pipelines | Client wants AI/ML capabilities |
+| [Data Platforms](data-platforms.md) | Data warehouses, lakes, pipelines, analytics | Client needs data infrastructure |
+| [Custom Applications](custom-applications.md) | Web apps, mobile apps, SaaS products | Client wants a bespoke application |
+| [Integration Projects](integration-projects.md) | System integrations, API gateways, ETL | Client connecting existing systems |
+| [Modernization](modernization.md) | Legacy migration, re-platforming, re-architecture | Client modernizing existing systems |
+
+## Using a Playbook
+
+Playbooks are automatically consumed by pre-sales and setup commands when relevant. You can also reference them explicitly:
+
+```
+/ais.presales.synthesize Use the agent-ai-builds playbook
+/ais.setup.plan Reference data-platforms playbook for architecture patterns
+```
+
+## Creating a New Playbook
+
+1. Copy `_playbook-template.md` to `{engagement-type}.md`
+2. Fill in all sections with domain-specific knowledge
+3. Add the playbook to the table above
+4. Test by running a pre-sales flow referencing the new playbook
+
+## Conventions
+
+- **Underscore prefix** (`_playbook-template.md`) marks the template — not an active playbook
+- Playbooks are **advisory, not prescriptive** — they inform recommendations, not mandate them
+- Mermaid diagrams are encouraged for architecture patterns
+- Effort estimates use T-shirt sizing (S/M/L/XL) consistent with spec effort fields
