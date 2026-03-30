@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Signature detection</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/ui/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar" aria-label="Site">
+        <div class="sidebar-brand">
+          <span class="sidebar-logo" aria-hidden="true">✓</span>
+          <div>
+            <div class="sidebar-title">Field check</div>
+            <div class="sidebar-sub">PDF signatures &amp; initials</div>
+          </div>
+        </div>
+
+        <nav class="sidebar-nav" aria-label="Primary">
+          <a href="/ui/" class="nav-item nav-item-active">
+            <span class="nav-icon" aria-hidden="true">↑</span>
+            Upload &amp; scan
+          </a>
+          <a href="/docs" class="nav-item" target="_blank" rel="noopener">
+            <span class="nav-icon" aria-hidden="true">◆</span>
+            API reference
+          </a>
+          <a href="/health" class="nav-item" target="_blank" rel="noopener">
+            <span class="nav-icon" aria-hidden="true">♥</span>
+            Service health
+          </a>
+        </nav>
+
+        <div class="sidebar-card">
+          <h3 class="sidebar-card-title">How it works</h3>
+          <ol class="sidebar-steps">
+            <li>Choose a PDF from your device.</li>
+            <li>Optional: list field names to check (comma-separated).</li>
+            <li>Review plain-language results on the right.</li>
+          </ol>
+        </div>
+
+        <div class="sidebar-footer">
+          <span class="sidebar-muted">Edward Jones · spec 2603-002</span>
+        </div>
+      </aside>
+
+      <div class="main-wrap">
+        <header class="topbar">
+          <h1 class="page-heading">Scan your document</h1>
+          <p class="page-lede">
+            Upload a PDF. We analyze the fields you care about and show a clear
+            summary—no raw data required.
+          </p>
+        </header>
+
+        <div class="layout-split">
+          <section class="card card-upload" aria-labelledby="upload-heading">
+            <h2 id="upload-heading" class="card-title">Upload</h2>
+            <form id="upload-form" class="upload-form">
+              <label class="field">
+                <span class="field-label">PDF file</span>
+                <input
+                  type="file"
+                  id="pdf-file"
+                  name="file"
+                  accept="application/pdf,.pdf"
+                  required
+                  class="file-input"
+                />
+              </label>
+
+              <label class="field">
+                <span class="field-label"
+                  >Fields to check <span class="optional">(optional)</span></span
+                >
+                <input
+                  type="text"
+                  id="fields"
+                  name="fields"
+                  placeholder="e.g. signature_field_1, initials"
+                  autocomplete="off"
+                  class="text-input"
+                />
+                <span class="field-hint">Separate names with commas. Defaults used if empty.</span>
+              </label>
+
+              <button type="submit" id="submit-btn" class="btn-primary">
+                Run detection
+              </button>
+            </form>
+            <p id="status" class="status" role="status" aria-live="polite"></p>
+          </section>
+
+          <section class="card card-results" aria-labelledby="results-heading">
+            <h2 id="results-heading" class="card-title">Results</h2>
+
+            <div id="results-empty" class="empty-state">
+              <div class="empty-illustration" aria-hidden="true">📄</div>
+              <p class="empty-text">
+                Your summary will appear here after you upload a PDF.
+              </p>
+            </div>
+
+            <div id="results-loading" class="results-loading" hidden>
+              <div class="loading-dots" aria-hidden="true">
+                <span></span><span></span><span></span>
+              </div>
+              <p class="loading-text">Analyzing your document…</p>
+            </div>
+
+            <div id="results-success" class="results-success" hidden>
+              <div class="summary-banner">
+                <span class="summary-icon" aria-hidden="true">✓</span>
+                <div>
+                  <p class="summary-title">Analysis complete</p>
+                  <p class="summary-meta">
+                    <span id="summary-time"></span>
+                    <span class="dot">·</span>
+                    <span id="summary-id" class="mono"></span>
+                  </p>
+                </div>
+              </div>
+              <ul id="results-rows" class="result-rows"></ul>
+            </div>
+
+            <div id="results-error" class="results-error" hidden>
+              <div class="error-banner">
+                <span class="error-icon" aria-hidden="true">!</span>
+                <div>
+                  <p class="error-title" id="error-title">Something went wrong</p>
+                  <p class="error-message" id="error-message"></p>
+                </div>
+              </div>
+            </div>
+
+            <details class="technical" id="technical-details" hidden>
+              <summary>Technical details (for support)</summary>
+              <pre id="technical-json" class="technical-pre"></pre>
+            </details>
+          </section>
+        </div>
+
+        <footer class="page-footer">
+          Questions? Use <a href="/docs">API docs</a> or contact your team admin.
+        </footer>
+      </div>
+    </div>
+    <script src="/ui/app.js"></script>
+  </body>
+</html>

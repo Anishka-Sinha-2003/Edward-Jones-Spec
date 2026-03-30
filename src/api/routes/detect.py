@@ -1,172 +1,113 @@
 """
-Detection Endpoint
+Detection endpoint — POST /api/v1/detect (multipart PDF).
 
-POST /api/v1/detect - Detect signatures in a document
-Spec Task: ENDPOINT-DETECT-1 through ENDPOINT-DETECT-4 (minimal implementation)
+Spec 2603-002: file upload + optional fields; JSON response with request id.
 """
 
-from signature_detection.models import (
-    DetectionRequest,
-    DetectionResponse,
-    PDFDocument,
-    PDFPage,
-    PDFObject,
-)
-from signature_detection import MockDetector
+from __future__ import annotations
+
+import asyncio
 import logging
-import sys
-import time
-from typing import Optional, List
+import re
+from datetime import datetime, timezone
+from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, File, Form, Request, UploadFile
 
-# Import detection models from 2603-001
-sys.path.insert(0, 'src')
+from api.exceptions import APIError, DetectionTimeoutError, DetectorRuntimeError
+from api.exceptions import PDFParsingError, PDFValidationError
+from api.schemas.responses import DetectionResponseData
+from api.services.detector_service import DetectorService
+from api.services.pdf_processing import PDFProcessingService
+from signature_detection.detectors.mock import MockDetector
 
-router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# Initialize detector once (singleton)
-detector = MockDetector()
+router = APIRouter()
+
+_detector = MockDetector()
+_detector_service = DetectorService(_detector)
+_pdf_service = PDFProcessingService()
+
+DETECT_TIMEOUT_S = 5.0
+FIELD_NAME_RE = re.compile(r"^[a-zA-Z0-9_]+$")
 
 
-class SimpleDetectRequest:
-    """
-    Minimal request schema for JSON input.
-    This is simpler than full PDF upload - just specify fields to detect.
-    """
-    fields: Optional[List[str]] = None  # Defaults to ["signature", "initials"]
+def _default_fields() -> List[str]:
+    return ["signature", "initials"]
+
+
+def _parse_fields_param(raw: Optional[str]) -> List[str]:
+    if raw is None or not str(raw).strip():
+        return _default_fields()
+    parts = [p.strip() for p in str(raw).split(",") if p.strip()]
+    return parts if parts else _default_fields()
+
+
+def _validate_field_names(names: List[str]) -> None:
+    for n in names:
+        if not FIELD_NAME_RE.match(n):
+            raise PDFValidationError(
+                "FIELDS_INVALID",
+                f"Field names must be alphanumeric with underscores: invalid {n!r}",
+            )
+
+
+async def _detect_with_timeout(document, field_list: List[str]):
+    loop = asyncio.get_running_loop()
+    return await asyncio.wait_for(
+        loop.run_in_executor(
+            None,
+            lambda: _detector_service.detect_fields(document, field_list),
+        ),
+        timeout=DETECT_TIMEOUT_S,
+    )
 
 
 @router.post(
     "/api/v1/detect",
-    summary="Detect Signatures",
-    description="Detect signature fields in a document",
+    summary="Detect signatures in a PDF",
+    description=(
+        "Upload a PDF file (multipart/form-data). "
+        "Optional `fields` form field: comma-separated names (default: signature, initials)."
+    ),
+    response_model=DetectionResponseData,
 )
-async def detect_signatures(request: dict) -> dict:
-    """
-    Minimal POST /detect endpoint.
+async def detect_signatures(
+    request: Request,
+    file: UploadFile = File(..., description="PDF document to analyze"),
+    fields: Optional[str] = Form(None),
+) -> DetectionResponseData:
+    request_id = getattr(request.state, "request_id", "unknown")
 
-    Request body (JSON):
-        {
-            "fields": ["signature_field_1", "signature_void", "initials"]
-        }
+    data = await file.read()
+    filename = file.filename or "upload.pdf"
 
-    Response (200 OK):
-        {
-            "results": [
-                {
-                    "field_name": "signature_field_1",
-                    "status": "present",
-                    "confidence": 0.92,
-                    "metadata": {}
-                },
-                ...
-            ],
-            "processing_time_ms": 5
-        }
+    _pdf_service.validate_bytes(data, file.content_type, filename)
 
-    How it works:
-        1. Accept JSON request with list of field names
-        2. Create mock PDFDocument (2-page document)
-        3. Call MockDetector.detect() with DetectionRequest
-        4. Return structured DetectionResponse
+    field_list = _parse_fields_param(fields)
+    _validate_field_names(field_list)
 
-    Raises:
-        HTTPException 400: Invalid field names
-        HTTPException 500: Detector error
-    """
     try:
-        # Extract fields from request
-        fields = request.get("fields", ["signature_field_1", "initials"])
+        document = _pdf_service.parse_pdf_bytes(data, filename)
+    except PDFParsingError:
+        raise
 
-        if not fields:
-            raise HTTPException(
-                status_code=400,
-                detail="fields list cannot be empty"
-            )
-
-        logger.info(f"📝 Detect request: {len(fields)} fields")
-
-        # Start timer
-        start_time = time.time()
-
-        # Create a mock PDFDocument (2-page document with test content)
-        # This is a simplified approach - in real API, would parse uploaded PDF
-        pages = [
-            PDFPage(
-                number=1,
-                width=612,  # Standard letter width in points
-                height=792,  # Standard letter height in points
-                objects=[
-                    PDFObject(
-                        obj_type="text",
-                        x=100, y=100, width=200, height=50,
-                        content="Page 1 - Signature Section"
-                    )
-                ]
-            ),
-            PDFPage(
-                number=2,
-                width=612,
-                height=792,
-                objects=[
-                    PDFObject(
-                        obj_type="text",
-                        x=100, y=100, width=200, height=50,
-                        content="Page 2 - Initials Section"
-                    )
-                ]
-            ),
-        ]
-
-        document = PDFDocument(
-            pages=pages,
-            metadata={"name": "test_document.pdf", "pages": 2}
-        )
-
-        logger.debug(f"📄 Created mock document: {len(pages)} pages")
-
-        # Create detection request for 2603-001 detector
-        detection_request = DetectionRequest(
-            document=document,
-            fields=fields
-        )
-
-        logger.debug(f"🔍 Calling MockDetector.detect()...")
-
-        # Call detector
-        detection_response = detector.detect(detection_request)
-
-        # Calculate processing time
-        elapsed_ms = int((time.time() - start_time) * 1000)
-
-        logger.info(
-            f"✅ Detection complete: {len(detection_response.results)} results, "
-            f"{elapsed_ms}ms"
-        )
-
-        # Return response as dict (FastAPI auto-serializes)
-        return {
-            "results": [
-                {
-                    "field_name": result.field_name,
-                    "status": result.status,
-                    "confidence": result.confidence,
-                    "metadata": result.metadata,
-                }
-                for result in detection_response.results
-            ],
-            "processing_time_ms": elapsed_ms,
-        }
-
-    except ValueError as e:
-        logger.warning(f"⚠️ Validation error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-
+    try:
+        results, processing_ms = await _detect_with_timeout(document, field_list)
+    except asyncio.TimeoutError:
+        logger.warning("Detection timeout for request_id=%s", request_id)
+        raise DetectionTimeoutError() from None
+    except APIError:
+        raise
     except Exception as e:
-        logger.error(f"🔥 Detection error: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail="Detection failed - see logs for details"
-        )
+        logger.exception("Detector failed request_id=%s", request_id)
+        raise DetectorRuntimeError(str(e)) from e
+
+    return DetectionResponseData(
+        id=f"req-{request_id}",
+        timestamp=datetime.now(timezone.utc),
+        version="1.0",
+        results=results,
+        processing_time_ms=processing_ms,
+    )

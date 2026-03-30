@@ -9,7 +9,7 @@ import logging
 from datetime import datetime
 from typing import Dict, Literal
 
-from fastapi import APIRouter, Response
+from fastapi import APIRouter
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 class HealthResponse:
     """Health check response schema (for documentation)."""
+
     status: Literal["healthy", "unhealthy"]
     timestamp: str  # ISO 8601
     version: str
@@ -46,28 +47,27 @@ async def health_check() -> Dict:
         - 503: Service is unhealthy
     """
     try:
-        # Check 1: Try importing detector (2603-001)
         try:
-            import sys
-            sys.path.insert(0, 'src')
-            from signature_detection import MockDetector
+            from signature_detection.detectors.mock import MockDetector
+
+            MockDetector()
             detector_status = "healthy"
         except ImportError as e:
-            logger.warning(f"❌ Detector import failed: {e}")
+            logger.warning("Detector import failed: %s", e)
             detector_status = "unhealthy"
 
-        # Check 2: Try importing pdfplumber (for PDF parsing)
         try:
-            import pdfplumber
+            import pdfplumber  # noqa: F401
+
             pdf_parser_status = "healthy"
         except ImportError:
-            logger.warning(
-                "⚠️ pdfplumber not installed (PDF parsing unavailable)")
+            logger.warning("pdfplumber not installed (PDF parsing unavailable)")
             pdf_parser_status = "unavailable"
 
-        # Overall status
-        all_healthy = detector_status == "healthy" and pdf_parser_status in [
-            "healthy", "unavailable"]
+        all_healthy = detector_status == "healthy" and pdf_parser_status in (
+            "healthy",
+            "unavailable",
+        )
 
         response = {
             "status": "healthy" if all_healthy else "degraded",
@@ -77,14 +77,14 @@ async def health_check() -> Dict:
                 "detector": detector_status,
                 "pdf_parser": pdf_parser_status,
                 "api": "healthy",
-            }
+            },
         }
 
-        logger.info(f"✅ Health check: {response['status']}")
+        logger.info("Health check: %s", response["status"])
         return response
 
     except Exception as e:
-        logger.error(f"🔥 Health check failed with error: {e}", exc_info=True)
+        logger.error("Health check failed: %s", e, exc_info=True)
         return {
             "status": "unhealthy",
             "timestamp": datetime.now().isoformat(),
@@ -94,5 +94,5 @@ async def health_check() -> Dict:
                 "pdf_parser": "unknown",
                 "api": "unhealthy",
             },
-            "error": str(e)
+            "error": str(e),
         }

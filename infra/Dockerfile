@@ -1,32 +1,19 @@
-# Multi-stage Dockerfile for Signature Detection API
-# Spec: 2603-002 REST API Integration
-
-FROM python:3.11-slim as builder
-
-WORKDIR /app
-
-# Install dependencies
-COPY requirements.txt .
-RUN pip install --user --no-cache-dir -r requirements.txt
-
-# Final stage
+# Signature Detection API — spec 2603-002
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# Copy Python dependencies from builder
-COPY --from=builder /root/.local /root/.local
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY src/ ./src/
-COPY api/ ./api/
+COPY src/ /app/src/
+COPY frontend/ /app/frontend/
 
-# Set PATH
-ENV PATH=/root/.local/bin:$PATH
+ENV PYTHONPATH=/app/src
 
-# Health check
+EXPOSE 8000
+
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')" || exit 1
 
-# Run API
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
